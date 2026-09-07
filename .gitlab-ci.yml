@@ -23,3 +23,33 @@ docker-backend-job:
   extends: .docker-build
   variables:
     SERVICE: backend
+cache-frontend-job:
+  stage: build
+  image: node:22-alpine
+  services: []
+  script:
+    - cd frontend
+    - npm ci --cache .npm --prefer-offline
+    - npm run build
+  cache:
+    key:
+      files: [frontend/package-lock.json]
+    paths: [frontend/.npm/, frontend/build/]
+  artifacts:
+    paths: [frontend/build/]
+    expire_in: 1 week
+cache-backend-job:
+  stage: build
+  image: python:3.10-alpine
+  services: []
+  variables:
+    PIP_CACHE_DIR: $CI_PROJECT_DIR/.pip-cache
+  script:
+    - pip wheel -r backend/requirements.txt --wheel-dir backend/wheels
+  cache:
+    key:
+      files: [backend/requirements.txt]
+    paths: [.pip-cache/]
+  artifacts:
+    paths: [backend/wheels/]
+    expire_in: 1 week

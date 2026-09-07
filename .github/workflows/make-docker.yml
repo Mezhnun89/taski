@@ -36,7 +36,7 @@ jobs:
         with:
           name: build-measurements
           path: reports/
-  native-cache:
+  cache-backend-job:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -58,3 +58,32 @@ jobs:
           python backend/manage.py check
           end=$(date +%s%N)
           echo "pip cache hit: $CACHE_HIT; install + check: $(( (end-start)/1000000 )) ms" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Build Python dependency wheels
+        run: python -m pip wheel -r backend/requirements.txt --wheel-dir reports/backend-wheels
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backend-wheels
+          path: reports/backend-wheels/
+  cache-frontend-job:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/cache@v4
+        id: frontend-build
+        with:
+          path: frontend/build
+          key: taski-frontend-node22-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json', 'frontend/package.json', 'frontend/src/**', 'frontend/public/**') }}
+      - name: Build React when source cache misses
+        if: steps.frontend-build.outputs.cache-hit != 'true'
+        working-directory: frontend
+        run: npm ci && npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/build/
