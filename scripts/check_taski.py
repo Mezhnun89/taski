@@ -40,5 +40,8 @@ try:
     print("PASS frontend proxy: create, update and list tasks", flush=True)
 finally:
     status, _ = request(base + str(item["id"]) + "/", "DELETE")
-    assert status == 204, status
+    # TaskView.destroy returns the deleted object with HTTP 200.
+    assert status == 200, status
+    status, raw = request(base)
+    assert not any(task["id"] == item["id"] for task in json.loads(raw))
     print("PASS temporary task removed", flush=True)
