@@ -1,0 +1,26 @@
+name: Make and Docker
+on:
+  push:
+    branches: [main, lesson-make-docker]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-and-run:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build images and start containers with make all
+        run: make all
+      - name: Check frontend and backend, then create and update a task through frontend proxy
+        run: python3 scripts/check_taski.py
+      - name: Show containers and logs
+        if: always()
+        run: |
+          docker ps -a
+          make logs
+      - name: Remove lesson containers
+        if: always()
+        run: make clear
