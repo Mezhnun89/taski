@@ -1,0 +1,55 @@
+stages: [build]
+image: docker:27-cli
+services:
+  - name: docker:27-dind
+variables:
+  DOCKER_HOST: tcp://docker:2376
+  DOCKER_TLS_CERTDIR: /certs
+  DOCKER_TLS_VERIFY: '1'
+  DOCKER_CERT_PATH: /certs/client
+  DOCKER_BUILDKIT: '1'
+.docker-build:
+  stage: build
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
+  script:
+    - docker buildx create --use
+    - docker buildx build --push --cache-from type=registry,ref="$CI_REGISTRY_IMAGE/taski-$SERVICE:buildcache" --cache-to type=registry,ref="$CI_REGISTRY_IMAGE/taski-$SERVICE:buildcache",mode=max -t "$CI_REGISTRY_IMAGE/taski-$SERVICE:$CI_COMMIT_SHA" "$SERVICE"
+docker-frontend-job:
+  extends: .docker-build
+  variables:
+    SERVICE: frontend
+docker-backend-job:
+  extends: .docker-build
+  variables:
+    SERVICE: backend
+cache-frontend-job:
+  stage: build
+  image: node:22-alpine
+  services: []
+  script:
+    - cd frontend
+    - npm ci --cache .npm --prefer-offline
+    - npm run build
+  cache:
+    key:
+      files: [frontend/package-lock.json]
+    paths: [frontend/.npm/, frontend/build/]
+  artifacts:
+    paths: [frontend/build/]
+    expire_in: 1 week
+cache-backend-job:
+  stage: build
+  image: python:3.10-alpine
+  services: []
+  variables:
+    PIP_CACHE_DIR: $CI_PROJECT_DIR/.pip-cache
+  script:
+    - pip wheel -r backend/requirements.txt --wheel-dir backend/wheels
+  cache:
+    key:
+      files: [backend/requirements.txt]
+    paths: [.pip-cache/]
+  artifacts:
+    paths: [backend/wheels/]
+    expire_in: 1 week

@@ -1,11 +1,12 @@
-# Учебный dev-server, версия Node из примера урока.
-FROM node:16.14.0-alpine
+FROM node:22-alpine AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
-# localhost внутри frontend-контейнера не является backend-контейнером.
-RUN npm pkg set proxy=http://taski-backend:8000
-ENV HOST=0.0.0.0
-EXPOSE 3000
-CMD ["npm", "start"]
+RUN npm run build
+
+FROM nginx:stable-alpine AS runtime
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/build /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
